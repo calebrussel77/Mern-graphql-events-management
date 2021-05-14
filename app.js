@@ -1,81 +1,29 @@
 const express = require("express");
 const cors = require("cors");
 const { graphqlHTTP } = require("express-graphql");
-const { buildSchema } = require("graphql");
+
+const dotenv = require("dotenv");
+const mongoose = require("mongoose");
+
+const graphqlRootSchema = require("./graphql/schema");
+const graphqlRootResolvers = require("./graphql/resolvers");
+const checkAuth = require("./middlewares/checkAuth");
+
+dotenv.config();
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-const events = [];
-const users = [
-  {
-    _id: "argdhgtghd246836",
-    name: "caleb russel",
-  },
-  {
-    _id: "argdhgtghd246836",
-    name: "Jane doe",
-  },
-];
+//check is Auth
+app.use(checkAuth);
 
 app.use(
   "/graphql",
   graphqlHTTP({
-    schema: buildSchema(`
-    type Event {
-        _id: ID!
-        title: String!
-        description: String!
-        price: Float!
-        date: String!
-    }
-    type User {
-        _id: ID!
-        name: String!
-    }
-
-    type RootEvent {
-        events: [Event!]!
-        users:[User!]!
-    }
-
-    input EventInput {
-        title: String!
-        description: String!
-        price: Float!
-        date: String
-    }
-
-    type RootQuery {
-        events: RootEvent
-    }
-
-    type RootMutation {
-        createEvent(eventInput : EventInput): Event
-    }
-        schema { 
-            query: RootQuery
-            mutation: RootMutation
-        }
-    `),
+    schema: graphqlRootSchema,
     //The resolvers
-    rootValue: {
-      events: () => {
-        return { events: events, users: users };
-      },
-      createEvent: (args) => {
-        const event = {
-          _id: Math.random.toString(),
-          title: args.eventInput.title,
-          description: args.eventInput.description,
-          price: +args.eventInput.price,
-          date: new Date().toISOString(),
-        };
-        events.push(event);
-        return event;
-      },
-    },
+    rootValue: graphqlRootResolvers,
     graphiql: true,
     pretty: true,
   })
@@ -85,4 +33,17 @@ app.get("/", (req, resp) => {
   resp.send("hello");
 });
 
-app.listen(3000);
+mongoose
+  .connect(process.env.DATABASE_URL, {
+    useNewUrlParser: true,
+    useCreateIndex: true,
+    useFindAndModify: false,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log("MongoDB is Connected SUCCESSFUL !");
+    app.listen(process.env.PORT || "4000");
+  })
+  .catch((err) => {
+    console.log(err);
+  });
